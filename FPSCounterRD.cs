@@ -10,17 +10,19 @@ using UnityEngine.UI;
 
 namespace GarbagePlugins
 {
-    [BepInPlugin("com.rhythmdr.fpscounterrd", "FPSCounterRD", "1.0.0")]
+    [BepInPlugin("com.rhythmdr.fpscounterrd", "FPSCounterRD", "1.1.0")]
     [BepInProcess("Rhythm Doctor.exe")]
     public class Plugin : BaseUnityPlugin
     {
-        private static ConfigEntry<bool> configShowFPS;
+        private static ConfigEntry<ShowFpsOptions> configShowFPS;
+
+        private enum ShowFpsOptions { Enabled, Legacy, Disabled }
 
         private void Awake()
         {
-            configShowFPS = Config.Bind("General", "ShowFPS", true, "Shows FPS counter at the top left of the screen");
+            configShowFPS = Config.Bind("General", "ShowFPS", ShowFpsOptions.Enabled, "Shows FPS counter at the top left of the screen");
 
-            if (configShowFPS.Value)
+            if (configShowFPS.Value != ShowFpsOptions.Disabled)
                 Harmony.CreateAndPatchAll(typeof(ShowFPS));
 
             Logger.LogInfo($"Plugin is loaded!");
@@ -39,8 +41,20 @@ namespace GarbagePlugins
             {
                 if (!RDC.debug){
                     __instance.debugText.gameObject.SetActive(true);
-                    int num4 = Mathf.RoundToInt(1f / Time.unscaledDeltaTime);
-                    __instance.debugText.text = "" + string.Format("<color=#ffffff>FPS:</color> <color={0}>{1}</color>", (object) (num4 < 30 ? "#ff0000" : (num4 < 50 ? "#ffff00" : "#00ff00")), (object) num4);
+
+                    switch (configShowFPS.Value)
+                    {
+                        case ShowFpsOptions.Enabled:
+                            if (scnGame.fps == 0.0) scnGame.fps = 1f / Time.unscaledDeltaTime;
+                            scnGame.fps = scnGame.fps * 0.99f + (1f / Time.unscaledDeltaTime) * 0.01f;
+                            __instance.debugText.text = "" + string.Format("<color=#ffffff>FPS:</color> <color={0}>{1}</color>", (object) (scnGame.fps < 30 ? "#ff0000" : (scnGame.fps < 50 ? "#ffff00" : "#00ff00")), (object) (int) scnGame.fps);
+                            break;
+                        case ShowFpsOptions.Legacy:
+                            int num = Mathf.RoundToInt(1f / Time.unscaledDeltaTime);
+                            __instance.debugText.text = "" + string.Format("<color=#ffffff>FPS:</color> <color={0}>{1}</color>", (object) (num < 30 ? "#ff0000" : (num < 50 ? "#ffff00" : "#00ff00")), (object) num);
+                            break;
+                    }
+                    
                     __instance.currentLevel.Update();
                 }
             }
